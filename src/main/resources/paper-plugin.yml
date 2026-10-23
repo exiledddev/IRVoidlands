@@ -1,0 +1,12 @@
+name: Voidlands
+version: '${version}'
+main: dev.exiled.voidlands.VoidlandsPlugin
+bootstrapper: dev.exiled.voidlands.VoidlandsBootstrap
+api-version: '1.21.11'
+description: World generator for the Voidlands, a Soul Sand Valley sky over patches of blackstone, mud, smooth basalt, soul sand and soul soil.
+dependencies:
+  server:
+    # Load before Multiverse-Core so the generator is ready when Multiverse loads its worlds.
+    Multiverse-Core:
+      load: AFTER
+      required: false

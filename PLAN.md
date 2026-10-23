@@ -11,7 +11,8 @@ Choices already made with the user:
 - **Terrain:** each biome has its own character. Mountains should be broad and massive ("fatter"),
   with wide foothills and rounded tops, not thin vanilla spikes.
 - **Mobs:** none.
-- **Nether rules:** made normal (water can be placed, beds don't explode, lava flows at normal speed).
+- **Nether rules:** made normal (water can be placed, beds don't explode). Lava still flows fast:
+  `gameplay/fast_lava` can only be set on a dimension type, not on a biome.
 - **Sound:** Soul Sand Valley ambience, no music.
 
 The repo (`/home/user/IRVoidlands`, branch `claude/intelligent-einstein-k011hs`) is empty: no commits
@@ -58,7 +59,6 @@ format is **94.1**. Template for each biome JSON
     "minecraft:audio/ambient_sounds": { /* copied verbatim from vanilla soul_sand_valley */ },
     "minecraft:audio/background_music": {},
     "minecraft:gameplay/water_evaporates": false,
-    "minecraft:gameplay/fast_lava": false,
     "minecraft:gameplay/bed_rule": { "can_sleep": "never", "can_set_spawn": "never", "explodes": false }
   },
   "spawners": { "ambient": [], "axolotls": [], "creature": [], "misc": [], "monster": [],
@@ -99,31 +99,35 @@ bedrock floor (y 0–4) like the Nether's. There is no ceiling.
   blocks match the F3 biome.
 
 **Heights** (`TerrainShaper`). This is where the "fat mountains" come from:
-- Base ground at y≈60. Each biome adds a profile: offset, rolling amplitude, and mountain weight.
-- Profiles blend across borders over a **wide** `blend-width` (≈80 blocks, smoothstep). A blackstone
-  patch rises as one broad massif with long foothills instead of a cliff at the border.
-- Massif shape: low-frequency fBm (wavelength ≈512) → `pow(smoothstep(0.25, 0.85, n), 1.4)` → times
-  `mountain-height` (≈100). This makes big rounded bodies with wide bases.
-- Ridges: `(1 − |simplex|)²` at wavelength ≈160. Their amplitude scales with the massif value, so ridge
-  lines only show on upper slopes and never form spikes.
-- Small detail noise of ±3 blocks or less keeps slopes smooth.
-- Basalt plateaus: a soft cap (smooth min) gives mesa-like flat tops. Dunes use stretched, wave-like
-  noise. The mire is almost flat.
-- Steep-slope rock: where the slope between neighbouring columns is above ~1.3, the surface becomes
-  blackstone in non-rock biomes. This looks like exposed rock. It can be turned off in the config.
+- Base ground at y≈60. Each biome adds a profile: offset, rolling amplitude, dune height and
+  mountain weight. Offset, rolling hills and dunes blend across borders over `blend-width` (≈80 blocks).
+- Mountains start at 0 on a patch's border and rise towards its middle over twice the blend width
+  (smoothstep). A blackstone patch rises as one broad massif with long foothills, never as a cliff
+  at the border, and the ground stays continuous without blending mountain heights.
+- Low-frequency swells (wavelength ≈260) give each massif several rounded summits of different
+  heights. Ridges `(1 − sqrt(n² + 0.02))²` at wavelength ≈150 are added high up only, with rounded
+  crests instead of knife edges. Small detail noise of ±1.5 blocks.
+- The border warp keeps its fine layers weak (persistence 0.4). Strong fine warp squeezes space and
+  made some flanks much steeper than others. Measured on 3 seeds: only 1–2% of mountain ground is
+  steeper than 45°, the maximum is about 63°, and adjacent columns never differ by more than 2 blocks.
+- Basalt plateaus: a smooth min caps the mountain, giving mesa-like flat tops. Dunes use stretched
+  ridged noise. The mire is almost flat.
 - Border dither: within `border-dither` (≈6) blocks of a border, a deterministic per-block hash mixes
   in the neighbour's surface block, so edges look ragged and natural.
+- Dropped from the first draft: "steep-slope rock". Slopes in the soft biomes never get steep enough
+  for it to show.
 
 **Generator** (`VoidlandsChunkGenerator`):
-- `generateNoise`: compute an 18×18 height grid (16×16 plus a 1-block border for the slope check), then
-  fill each column with `ChunkData.setRegion` (bedrock → blackstone → surface layers).
+- `generateNoise`: for each of the 16×16 columns, fill it with `ChunkData.setRegion`
+  (blackstone → soul soil under soul sand → surface layers), then the jagged bedrock floor.
 - All `shouldGenerate*()` methods return `false` (noise, surface, caves, decorations, mobs, structures),
   so no vanilla Nether terrain, fortresses or bastions.
 - `getBaseHeight` returns the terrain height. `getFixedSpawnLocation` returns (0.5, h+1, 0.5).
 - `getDefaultBiomeProvider` returns `VoidlandsBiomeProvider`.
 - Thread safety: worldgen runs on several threads. The noise objects are immutable, built once per
   world seed (`worldInfo.getSeed()`) and cached. Nothing mutable is shared during generation.
-- Noise uses Bukkit's built-in `org.bukkit.util.noise.SimplexNoiseGenerator`, so the jar has no
+- Noise is a small seeded simplex implementation in the plugin (`SimplexNoise`). The terrain code has no
+  Bukkit imports, so it can be unit-tested and previewed without a server, and the jar has no
   shaded dependencies.
 
 **Biome provider** (`VoidlandsBiomeProvider`): `getBiome` → `layout.biomeAt(x, z)` → cached Bukkit
@@ -135,14 +139,14 @@ bedrock floor (y 0–4) like the Nether's. There is no ceiling.
 ```
 build.gradle.kts / settings.gradle.kts / gradlew (Gradle wrapper)
   - Java 21 toolchain, compileOnly io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT
-  - xyz.jpenilla.run-paper for a local test server (Paper 1.21.11 + Multiverse-Core 5 via downloadPlugins)
+  - xyz.jpenilla.run-paper 3.1.0 (needs Gradle 9.7+, wrapper pinned to 9.7.1) for a local test server
 .github/workflows/build.yml       builds the jar and uploads it as an artifact
 README.md                         install, /mv create command, teleport commands, how to tune
 src/main/resources/
   paper-plugin.yml                name: Voidlands, bootstrapper + main, api-version '1.21.11',
                                   dependencies.server.Multiverse-Core: { load: AFTER, required: false }
   config.yml                      patch-size, border-warp, border-dither, biome weights,
-                                  base-height, blend-width, mountain-height, steep-slope-rock
+                                  base-height, blend-width, mountain-height
   voidlands_pack/pack.mcmeta      format 94.1
   voidlands_pack/data/voidlands/worldgen/biome/*.json   (5 files, template above)
 src/main/java/dev/exiled/voidlands/      (package name is a placeholder)

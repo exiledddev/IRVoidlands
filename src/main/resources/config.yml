@@ -1,0 +1,32 @@
+# Voidlands world generator settings.
+#
+# WARNING: changing anything here after a Voidlands world exists makes newly generated
+# chunks stop lining up with the old ones (visible seams). Tune on a throwaway world,
+# then create the real one.
+#
+# The sky, fog, particles and sounds are not set here. They live in the datapack JSON
+# files in plugins/Voidlands/datapack/data/voidlands/worldgen/biome/ (see README.md).
+
+biomes:
+  # Average width of one biome patch, in blocks.
+  patch-size: 384
+  # How far patch borders wander, in blocks. 0 gives straight-edged patches.
+  border-warp: 72
+  # Width of the ragged band at patch borders where both biomes' blocks mix, in blocks.
+  border-dither: 6
+  # Relative chance for a patch to be each biome. Set one to 0 to turn that biome off.
+  weights:
+    blackstone_peaks: 1.0
+    basalt_plateaus: 1.0
+    soul_soil_hills: 1.0
+    soul_sand_dunes: 1.0
+    mud_mire: 1.0
+
+terrain:
+  # Average ground level (y). The world is 0-255 high.
+  base-height: 60
+  # How far terrain blends into the neighbouring patch, in blocks. Mountains rise from a
+  # patch's border over twice this distance, so bigger values give broader, fatter mountains.
+  blend-width: 80
+  # Height of the biggest mountains above the ground, in blocks.
+  mountain-height: 100
