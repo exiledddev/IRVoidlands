@@ -18,6 +18,38 @@ Choices already made with the user:
 The repo (`/home/user/IRVoidlands`, branch `claude/intelligent-einstein-k011hs`) is empty: no commits
 and no code to reuse.
 
+## Revision 2 (v1.1.0): floating islands and spikes
+
+The user asked to turn the continuous terrain into floating islands and to add glowing spikes:
+often, but never more than one per chunk. This supersedes the continuous ground and bedrock floor
+described further down. The biome patches, biome profiles, mountains and datapack are unchanged.
+
+- **Islands** (`gen/IslandShaper.java`): one island centre per jittered grid cell (cell =
+  1.3 × `islands.size`).
+  - Each island gets its own radius (0.45–1.0 × size/2, with 15% "giants" at 1.35×) and its own
+    altitude (± `height-variation`). 20% of cells are empty.
+  - The island field is `max(1 − distance/radius)` over the 3×3 nearby cells. Distances are measured
+    on a warped point, which gives lobes and arms, and the coast is roughened with noise. The
+    threshold is the sampled quantile for `islands.coverage`.
+  - Merged islands blend their altitudes with weights `(field + 0.4)^4`, so the ground stays
+    continuous.
+  - Where the field is above the threshold, its distance above it is the "inland" value. It sets
+    the underside depth (a cone up to `thickness`, plus drips), the rim drop at coasts, and the
+    mountain fade-in `smoothstep(inland / 4)`. The fade-in keeps mountains from ending in coastal
+    cliffs.
+  - A spawn island is always forced at 0, 0. Islets (small rocks) come from a separate noise, only
+    out in the void.
+- **Spikes** (`gen/SpikeField.java`): at most one per `spikes.spacing` (64) cell, placed in the
+  cell's middle half. Spikes are therefore at least 32 blocks apart, so never two in one chunk.
+  - Each cell rolls `spikes.chance` × a per-biome factor, and only places a spike over island
+    ground with solid ground under its foot.
+  - Shape: a leaning, jagged cone 12–32 blocks tall. Blocks: obsidian, crying obsidian veins,
+    pearlescent froglight veins and tip, and a sculk patch at the foot.
+  - Each chunk works out every spike that reaches into it from the hashed cells and draws only its
+    own part, so spikes are never cut at chunk borders. A unit test checks this.
+- **Measured** (3 seeds, 2048² each): coverage ≈ 30%, ground y 25–208, adjacent island columns
+  differ by at most 6 blocks (under 0.01% by more than 4), and about one spike per 40 island chunks.
+
 ## Decision: Paper plugin with a small datapack inside it
 
 | | Datapack only | Plugin only | **Plugin + bundled datapack** |

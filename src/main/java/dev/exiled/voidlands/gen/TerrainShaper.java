@@ -5,7 +5,7 @@ import dev.exiled.voidlands.VoidlandsSettings;
 import static dev.exiled.voidlands.gen.BiomeLayout.smoothstep;
 
 /**
- * Turns a biome sample into a ground height.
+ * Shapes the ground on top of an island from a biome sample.
  *
  * <p>The gentle parts of each biome's profile (ground offset, rolling hills, dunes) are blended
  * across patch borders with the sample's weights. Mountains work differently: they start at zero on
@@ -15,7 +15,6 @@ import static dev.exiled.voidlands.gen.BiomeLayout.smoothstep;
  */
 final class TerrainShaper {
 
-    private final double baseHeight;
     private final double mountainHeight;
     private final double riseWidth;
     private final SimplexNoise rolling;
@@ -26,9 +25,8 @@ final class TerrainShaper {
     private final SimplexNoise depth;
 
     TerrainShaper(long seed, VoidlandsSettings settings) {
-        this.baseHeight = settings.baseHeight();
-        this.mountainHeight = settings.mountainHeight();
-        this.riseWidth = settings.blendWidth() * 2;
+        this.mountainHeight = settings.terrain().mountainHeight();
+        this.riseWidth = settings.terrain().blendWidth() * 2;
         this.rolling = new SimplexNoise(seed + 1);
         this.massif = new SimplexNoise(seed + 2);
         this.ridges = new SimplexNoise(seed + 3);
@@ -37,26 +35,40 @@ final class TerrainShaper {
         this.depth = new SimplexNoise(seed + 6);
     }
 
-    double height(BiomeLayout.Sample sample, double x, double z) {
+    /** The biomes' blended ground level, relative to the island's height. */
+    double groundOffset(BiomeLayout.Sample sample) {
         double offset = 0;
+        double[] weights = sample.weights();
+        for (VoidBiome biome : VoidBiome.VALUES) {
+            offset += weights[biome.ordinal()] * biome.offset;
+        }
+        return offset;
+    }
+
+    /**
+     * Hills, dunes and mountains on top of the ground level.
+     *
+     * @param mountainScale 0 to 1; how much of the mountains to build (islands keep them off their edges)
+     */
+    double relief(BiomeLayout.Sample sample, double x, double z, double mountainScale) {
         double rollingAmplitude = 0;
         double duneAmplitude = 0;
         double[] weights = sample.weights();
         for (VoidBiome biome : VoidBiome.VALUES) {
             double weight = weights[biome.ordinal()];
-            offset += weight * biome.offset;
             rollingAmplitude += weight * biome.rolling;
             duneAmplitude += weight * biome.dunes;
         }
 
-        double height = baseHeight + offset;
-        height += rollingAmplitude * rolling.fbm(x / 160.0, z / 160.0, 3);
+        double relief = rollingAmplitude * rolling.fbm(x / 160.0, z / 160.0, 3);
         if (duneAmplitude > 0) {
-            height += duneAmplitude * dune(x, z);
+            relief += duneAmplitude * dune(x, z);
         }
-        height += mountain(sample, x, z);
-        height += 1.5 * detail.fbm(x / 24.0, z / 24.0, 2);
-        return height;
+        if (mountainScale > 0) {
+            relief += mountainScale * mountain(sample, x, z);
+        }
+        relief += 1.5 * detail.fbm(x / 24.0, z / 24.0, 2);
+        return relief;
     }
 
     /** How many blocks of the surface material sit on top of the rock: 3 to 5. */

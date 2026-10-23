@@ -40,19 +40,20 @@ final class BiomeLayout {
 
     BiomeLayout(long seed, VoidlandsSettings settings) {
         this.seed = seed;
-        this.cellSize = settings.patchSize();
-        this.warp = settings.borderWarp();
-        this.warpScale = settings.patchSize();
-        this.blendWidth = settings.blendWidth();
+        this.cellSize = settings.biomes().patchSize();
+        this.warp = settings.biomes().borderWarp();
+        this.warpScale = settings.biomes().patchSize();
+        this.blendWidth = settings.terrain().blendWidth();
         this.warpX = new SimplexNoise(seed ^ 0x5DEECE66DL);
         this.warpZ = new SimplexNoise(seed ^ 0x2545F4914F6CDD1DL);
 
-        double total = settings.weights().values().stream().mapToDouble(Double::doubleValue).sum();
+        var weights = settings.biomes().weights();
+        double total = weights.values().stream().mapToDouble(Double::doubleValue).sum();
         this.choices = VoidBiome.VALUES.clone();
         this.thresholds = new double[choices.length];
         double cumulative = 0;
         for (int i = 0; i < choices.length; i++) {
-            cumulative += settings.weights().get(choices[i]) / total;
+            cumulative += weights.get(choices[i]) / total;
             thresholds[i] = cumulative;
         }
     }

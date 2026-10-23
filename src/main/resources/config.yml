@@ -8,7 +8,7 @@
 # files in plugins/Voidlands/datapack/data/voidlands/worldgen/biome/ (see README.md).
 
 biomes:
-  # Average width of one biome patch, in blocks.
+  # Average width of one biome patch, in blocks. One island can hold several patches.
   patch-size: 384
   # How far patch borders wander, in blocks. 0 gives straight-edged patches.
   border-warp: 72
@@ -22,11 +22,36 @@ biomes:
     soul_sand_dunes: 1.0
     mud_mire: 1.0
 
+islands:
+  # Share of the world that is island, from 0.05 to 0.9. The rest is open void.
+  coverage: 0.3
+  # Rough width of a big island, in blocks. Islands vary from about half to 1.4 times this.
+  size: 320
+  # Average height (y) of the islands' ground. The world is 0-255 high.
+  height: 110
+  # How far an island can sit above or below that height, in blocks.
+  height-variation: 25
+  # How deep the underside of the biggest islands hangs, in blocks.
+  thickness: 45
+  # Small floating rocks between the islands, from 0 (none) to 1 (lots).
+  islets: 0.5
+
 terrain:
-  # Average ground level (y). The world is 0-255 high.
-  base-height: 60
   # How far terrain blends into the neighbouring patch, in blocks. Mountains rise from a
   # patch's border over twice this distance, so bigger values give broader, fatter mountains.
   blend-width: 80
-  # Height of the biggest mountains above the ground, in blocks.
-  mountain-height: 100
+  # Height of the biggest mountains above the island ground, in blocks.
+  mountain-height: 70
+
+spikes:
+  # Glowing obsidian spikes with crying obsidian veins, froglight and sculk at the foot.
+  enabled: true
+  # The world is split into squares this many blocks wide, each holding at most one spike.
+  # 46 or more, so two spikes never share a chunk.
+  spacing: 64
+  # Chance that a square with island ground under it gets a spike, from 0 to 1.
+  # Blackstone peaks get the full chance, the other biomes a bit less, mud the least.
+  chance: 0.7
+  # Spike height range, in blocks.
+  min-height: 12
+  max-height: 32

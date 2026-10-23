@@ -15,9 +15,9 @@ import java.util.Random;
 import java.util.logging.Logger;
 
 /**
- * Builds the Voidlands terrain: a jagged bedrock floor, blackstone rock, and 3 to 5 blocks of the
- * biome's surface material on top. Every vanilla generation step is switched off, so there are no
- * caves, ores, Nether features, structures or mobs.
+ * Builds the Voidlands: floating islands of blackstone with 3 to 5 blocks of the biome's surface
+ * material on top, open void between them, and the occasional glowing spike. Every vanilla
+ * generation step is switched off, so there are no caves, ores, Nether features, structures or mobs.
  */
 public final class VoidlandsChunkGenerator extends ChunkGenerator {
 
@@ -59,38 +59,55 @@ public final class VoidlandsChunkGenerator extends ChunkGenerator {
         VoidlandsTerrain terrain = terrain(worldInfo);
         int minY = chunk.getMinHeight();
         int maxY = chunk.getMaxHeight();
+        int baseX = chunkX << 4;
+        int baseZ = chunkZ << 4;
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
-                int x = (chunkX << 4) + localX;
-                int z = (chunkZ << 4) + localZ;
-                VoidlandsTerrain.Column column = terrain.column(x, z);
-                int top = clampHeight(column.height(), minY, maxY);
-                int surfaceBottom = top - column.surfaceDepth() + 1;
+                VoidlandsTerrain.Column column = terrain.column(baseX + localX, baseZ + localZ);
+                if (!column.solid()) {
+                    continue;
+                }
+                int top = Math.min(column.top(), maxY - 1);
+                int bottom = Math.max(column.bottom(), minY);
+                if (top < bottom) {
+                    continue;
+                }
+                int surfaceBottom = Math.max(bottom, top - column.surfaceDepth() + 1);
 
-                chunk.setRegion(localX, minY, localZ, localX + 1, top + 1, localZ + 1, Material.BLACKSTONE);
+                chunk.setRegion(localX, bottom, localZ, localX + 1, top + 1, localZ + 1, Material.BLACKSTONE);
                 if (column.surface() == VoidBiome.SOUL_SAND_DUNES) {
-                    chunk.setRegion(localX, surfaceBottom - SOUL_SOIL_UNDER_SOUL_SAND, localZ,
+                    chunk.setRegion(localX, Math.max(bottom, surfaceBottom - SOUL_SOIL_UNDER_SOUL_SAND), localZ,
                             localX + 1, surfaceBottom, localZ + 1, Material.SOUL_SOIL);
                 }
                 chunk.setRegion(localX, surfaceBottom, localZ, localX + 1, top + 1, localZ + 1,
                         surfaceBlock(column.surface()));
-                for (int layer = 0; layer < VoidlandsTerrain.BEDROCK_LAYERS; layer++) {
-                    if (terrain.bedrock(x, layer, z)) {
-                        chunk.setBlock(localX, minY + layer, localZ, Material.BEDROCK);
-                    }
-                }
             }
+        }
+
+        SpikeField spikes = terrain.spikes();
+        int maxX = baseX + 15;
+        int maxZ = baseZ + 15;
+        for (SpikeField.Spike spike : spikes.spikesNear(baseX, baseZ, maxX, maxZ)) {
+            spikes.forEachBlock(spike, baseX, baseZ, maxX, maxZ, (x, y, z, block) -> {
+                if (y >= minY && y < maxY) {
+                    chunk.setBlock(x - baseX, y, z - baseZ, spikeBlock(block));
+                }
+            });
         }
     }
 
     @Override
     public int getBaseHeight(WorldInfo worldInfo, Random random, int x, int z, HeightMap heightMap) {
-        int height = terrain(worldInfo).column(x, z).height();
-        return clampHeight(height, worldInfo.getMinHeight(), worldInfo.getMaxHeight()) + 1;
+        VoidlandsTerrain.Column column = terrain(worldInfo).column(x, z);
+        if (!column.solid()) {
+            return worldInfo.getMinHeight();
+        }
+        return Math.min(column.top(), worldInfo.getMaxHeight() - 1) + 1;
     }
 
     @Override
     public Location getFixedSpawnLocation(World world, Random random) {
+        // The island noise always puts land under the origin, so this is solid ground.
         return new Location(world, 0.5, getBaseHeight(world, random, 0, 0, HeightMap.WORLD_SURFACE), 0.5);
     }
 
@@ -129,11 +146,6 @@ public final class VoidlandsChunkGenerator extends ChunkGenerator {
         return false;
     }
 
-    /** Keeps the top block above the bedrock and leaves room to stand at the build limit. */
-    private static int clampHeight(int height, int minY, int maxY) {
-        return Math.clamp(height, minY + VoidlandsTerrain.BEDROCK_LAYERS + 3, maxY - 3);
-    }
-
     private static Material surfaceBlock(VoidBiome biome) {
         return switch (biome) {
             case BLACKSTONE_PEAKS -> Material.BLACKSTONE;
@@ -141,6 +153,15 @@ public final class VoidlandsChunkGenerator extends ChunkGenerator {
             case SOUL_SOIL_HILLS -> Material.SOUL_SOIL;
             case SOUL_SAND_DUNES -> Material.SOUL_SAND;
             case MUD_MIRE -> Material.MUD;
+        };
+    }
+
+    private static Material spikeBlock(SpikeField.Block block) {
+        return switch (block) {
+            case OBSIDIAN -> Material.OBSIDIAN;
+            case CRYING_OBSIDIAN -> Material.CRYING_OBSIDIAN;
+            case GLOW -> Material.PEARLESCENT_FROGLIGHT;
+            case SCULK -> Material.SCULK;
         };
     }
 }
